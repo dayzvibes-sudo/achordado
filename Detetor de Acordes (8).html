@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Detetor de Acordes</title>
+<style>
+:root{--bg:#f6f5f2;--fg:#1c1b1a;--mut:#6b6762;--card:#fff;--bd:#dedad3;--ac:#5b3df5;--ac2:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141316;--fg:#f0eee9;--mut:#9a958d;--card:#1f1d22;--bd:#34313a;--ac:#8b78ff;--ac2:#10091f}}
+:root[data-theme="dark"]{--bg:#141316;--fg:#f0eee9;--mut:#9a958d;--card:#1f1d22;--bd:#34313a;--ac:#8b78ff;--ac2:#10091f}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:880px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+#drop{border:2px dashed var(--bd);border-radius:14px;padding:34px 16px;text-align:center;cursor:pointer;background:var(--card)}
+#drop.on,#drop:hover{border-color:var(--ac)}#drop b{display:block;font-size:1.05rem}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:end}.row label{display:flex;flex-direction:column;font-size:.8rem;color:var(--mut);gap:4px}
+select,input[type=number]{font:inherit;padding:7px 9px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg)}
+input[type=number]{width:90px}input[type=range]{width:160px;accent-color:var(--ac)}
+button{font:inherit;font-weight:600;padding:10px 16px;border:0;border-radius:10px;background:var(--ac);color:var(--ac2);cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.bar{height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .15s}
+#cur{font-size:3rem;font-weight:800;text-align:center;line-height:1.1;margin:6px 0}
+#tl{position:relative;display:flex;height:34px;border-radius:8px;overflow:hidden;margin:10px 0;cursor:pointer}
+#tl span{height:100%;min-width:1px}#ph{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);pointer-events:none}
+audio{width:100%;margin-top:8px}
+#list{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;max-height:340px;overflow-y:auto}
+#list div{border:1px solid var(--bd);border-radius:8px;padding:5px 8px;cursor:pointer;font-weight:600}#list div small{display:block;color:var(--mut);font-weight:400}
+#list div.a{background:var(--ac);color:var(--ac2);border-color:var(--ac)}#list div.a small{color:inherit}
+.m{color:var(--mut);font-size:.9rem}[hidden]{display:none!important}
+.fl{display:flex;flex-direction:column;font-size:.8rem;color:var(--mut);gap:4px}
+.seg{display:flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden}.seg button{border-radius:0;background:var(--bg);color:var(--fg);flex:1;padding:8px 4px;font-weight:500;font-size:.8rem}.seg button.on{background:var(--ac);color:var(--ac2)}
+#rb{touch-action:pan-y;cursor:grab;width:100%;height:80px;display:block;margin:8px 0;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
+#pn{position:relative;height:84px;margin:12px auto;max-width:560px}#pn i{position:absolute;display:block}
+#pn .wk{top:0;bottom:0;background:#fff;border:1px solid #0003;border-radius:0 0 4px 4px}#pn .bk{top:0;height:58%;background:#222;border-radius:0 0 3px 3px;z-index:2}
+#pn .n{background:var(--ac)!important}#pn .r{background:#ff8a3d!important}
+#gt{display:flex;justify-content:center;align-items:flex-end;gap:28px;margin:10px 0}#gt svg{display:block;width:142px;height:auto}#g2{opacity:.6}#g2 svg{width:112px}
+</style>
+</head>
+<body>
+<main>
+<h1>Detetor de Acordes</h1>
+<p class="s">Largas um ficheiro de áudio e obténs os acordes, a tonalidade, o BPM e um MIDI. Tudo corre no teu dispositivo: o áudio nunca sai daqui.</p>
+<div id="drop"><b>Larga aqui o ficheiro de áudio</b><span class="m">ou toca para escolher (MP3, WAV, M4A, OGG, FLAC…)</span><input id="f" type="file" accept="audio/*" hidden></div>
+<div class="card" id="prog" hidden><div id="pt" class="m">A preparar…</div><div class="bar"><i id="pb"></i></div></div>
+<div id="res" hidden>
+<div class="card">
+<div id="cur">–</div>
+<div class="m" style="text-align:center"><b id="nt" style="color:var(--fg)"></b> <span id="nx"></span></div>
+<div class="seg" id="ins" style="width:max-content;margin:8px auto 0"><button class="on">Piano</button><button>Guitarra</button></div>
+<div id="pn"></div>
+<div id="gt" hidden><div id="g1"></div><div id="g2"></div></div>
+<canvas id="rb"></canvas>
+<div class="m" style="text-align:center" id="info"></div>
+<div id="tl"><div id="ph"></div></div>
+<audio id="au" controls></audio>
+</div>
+<div class="card">
+<div class="row">
+<label>Complexidade<select id="ext"><option value="0">Tríades (maior / menor)</option><option value="1" selected>Com sétimas (7, maj7, m7)</option></select></label>
+<div class="fl">Estabilidade<div class="seg" id="lv" style="width:min(92vw,380px)"><button>Fino</button><button class="on">Normal</button><button>Estável</button><button>Firme</button><button>Máximo</button></div></div>
+<label>Tom<select id="kx"><option value="">Automático</option></select></label>
+<label>BPM<span style="display:flex;gap:4px"><input id="bpm" type="number" min="30" max="300" step="0.1"><button id="b2" title="Metade do tempo" style="padding:6px 9px">÷2</button><button id="bx" title="Dobro do tempo" style="padding:6px 9px">×2</button></span></label>
+<label style="flex-direction:row;align-items:center;gap:8px"><input id="snap" type="checkbox" checked> Alinhar à batida</label>
+</div>
+<p class="m" style="margin:10px 0 0">Estável = acordes mais longos e limpos (bom com muita bateria ou ruído). Detalhado = apanha mudanças rápidas. Se o tom automático falhar, escolhe-o à mão.</p>
+</div>
+<div class="card">
+<div class="row" style="margin-bottom:12px"><button id="dl">Descarregar MIDI</button><span id="dls" class="m"></span></div>
+<div id="list"></div>
+</div>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const SR=22050,N=8192,HOP=1024,HS=HOP/SR;
+const SH=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],FL=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const TYPES=[['',[0,4,7],0],['m',[0,3,7],0],['7',[0,4,7,10],.09],['maj7',[0,4,7,11],.09],['m7',[0,3,7,10],.09]];
+const KM=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88],Km=[6.33,2.68,3.52,5.38,2.6,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+let S={an:null,segs:[],chs:[],lv:1},file=null,dirty=true;
+
+/* FFT */
+function mkFFT(n){const lv=Math.log2(n),rev=new Uint32Array(n),co=new Float64Array(n/2),si=new Float64Array(n/2);
+for(let i=0;i<n;i++){let r=0;for(let b=0;b<lv;b++)r|=((i>>b)&1)<<(lv-1-b);rev[i]=r}
+for(let i=0;i<n/2;i++){co[i]=Math.cos(2*Math.PI*i/n);si[i]=-Math.sin(2*Math.PI*i/n)}
+return(re,im)=>{for(let i=0;i<n;i++){const j=rev[i];if(j>i){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}
+for(let s=2;s<=n;s<<=1){const h=s>>1,st=n/s;for(let i=0;i<n;i+=s)for(let k=0,t=0;k<h;k++,t+=st){const a=i+k,b=a+h,tr=re[b]*co[t]-im[b]*si[t],ti=re[b]*si[t]+im[b]*co[t];re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti}}}}
+const tick=()=>new Promise(r=>setTimeout(r));
+function prog(p,t){$('pb').style.width=(p*100)+'%';if(t)$('pt').textContent=t}
+
+/* Análise */
+async function analyze(buf){
+prog(.02,'A converter para mono e reamostrar…');
+const len=Math.ceil(buf.duration*SR),oc=new OfflineAudioContext(1,len,SR),src=oc.createBufferSource();src.buffer=buf;src.connect(oc.destination);src.start();
+const y=(await oc.startRendering()).getChannelData(0);
+const nF=Math.max(1,Math.floor((len-N)/HOP)+1),fft=mkFFT(N),win=new Float64Array(N);
+for(let i=0;i<N;i++)win[i]=.5-.5*Math.cos(2*Math.PI*i/N);
+const re=new Float64Array(N),im=new Float64Array(N),mag=new Float64Array(N/2+1),prev=new Float64Array(N/2+1);
+const lo=Math.floor(50*N/SR),hi=Math.floor(4200*N/SR),fb=Math.floor(4000*N/SR);
+const pk=[],flux=new Float64Array(nF),en=new Float64Array(nF),sc=4/N,K=hi-lo+2,M=new Float32Array(nF*K);
+for(let t=0;t<nF;t++){
+ const o=t*HOP;let e=0;
+ for(let i=0;i<N;i++){const v=(y[o+i]||0);re[i]=v*win[i];im[i]=0;e+=v*v}
+ en[t]=Math.sqrt(e/N);fft(re,im);
+ let fx=0,mx=1e-12;
+ for(let k=1;k<=N/2;k++){const m=Math.hypot(re[k],im[k])*sc;mag[k]=m;if(k<=fb){const l=Math.log1p(50*m);if(l>prev[k])fx+=l-prev[k];prev[k]=l}else prev[k]=0;if(k>=lo&&k<=hi&&m>mx)mx=m}
+ flux[t]=fx;M.set(mag.subarray(lo,hi+2),t*K);const p=[];
+ for(let k=Math.max(lo,2);k<=hi;k++){const b=mag[k];if(b>.06*mx&&b>mag[k-1]&&b>=mag[k+1]){const a=Math.log(mag[k-1]+1e-12),c=Math.log(mag[k+1]+1e-12),bb=Math.log(b),d=.5*(a-c)/(a-2*bb+c);p.push((k+(isFinite(d)?d:0))*SR/N,b/mx)}}
+ pk.push(p);
+ if(t%40==0){prog(.05+.8*t/nF,'A analisar o espectro… '+Math.round(100*t/nF)+'%');await tick()}
+}
+prog(.88,'A estimar afinação, tom e tempo…');await tick();
+/* afinação */
+const H=new Float64Array(50);
+for(const p of pk)for(let i=0;i<p.length;i+=2){const f=p[i];if(f<100||f>2000)continue;const m=69+12*Math.log2(f/440),d=m-Math.round(m);H[Math.min(49,Math.floor((d+.5)*50))]+=p[i+1]}
+let tb=0,tbs=-1;for(let i=0;i<50;i++){const s=H[(i+49)%50]+2*H[i]+H[(i+1)%50];if(s>tbs){tbs=s;tb=i}}
+const tune=(tb+.5)/50-.5;
+/* chroma */
+const C=new Float32Array(nF*12),B=new Float32Array(nF*12);
+prog(.89,'A separar a percussão…');await tick();
+const med=(a,n)=>{for(let i=1;i<n;i++){const v=a[i];let j=i-1;while(j>=0&&a[j]>v){a[j+1]=a[j];j--}a[j+1]=v}return a[n>>1]};
+const Hm=new Float32Array(nF*K),tm=new Float32Array(15),Mk=new Float32Array(K);
+for(let t=0;t<nF;t++){const u0=Math.max(0,t-4),n=Math.min(nF-1,t+4)-u0+1;for(let k=0;k<K;k++){for(let j=0;j<n;j++)tm[j]=M[(u0+j)*K+k];Hm[t*K+k]=med(tm,n)}if(t%80==0)await tick()}
+for(let t=0;t<nF;t++){let mx=1e-12;
+ for(let k=0;k<K;k++){const k0=Math.max(0,k-7),n=Math.min(K-1,k+7)-k0+1;for(let j=0;j<n;j++)tm[j]=M[t*K+k0+j];const p=med(tm,n),h=Hm[t*K+k];Mk[k]=M[t*K+k]*h*h/(h*h+p*p+1e-18);if(k&&k<K-1&&Mk[k]>mx)mx=Mk[k]}
+ for(let k=1;k<K-1;k++){const b=Mk[k];if(b>.06*mx&&b>Mk[k-1]&&b>=Mk[k+1]){const a0=Math.log(Mk[k-1]+1e-12),c0=Math.log(Mk[k+1]+1e-12),b0=Math.log(b),d0=.5*(a0-c0)/(a0-2*b0+c0),f=(k+lo+(isFinite(d0)?d0:0))*SR/N,m=69+12*Math.log2(f/440)-tune,r=Math.round(m),cc=Math.cos(Math.PI*(m-r)),w=Math.sqrt(b/mx)*cc*cc/(1+f/1500),pc=((r%12)+12)%12;C[t*12+pc]+=w;if(f<250)B[t*12+pc]+=w}}
+ if(t%80==0)await tick()}
+for(let t=0;t<nF;t++){const p=[];for(let i=0;i<p.length;i+=2){const f=p[i],m=69+12*Math.log2(f/440)-tune,r=Math.round(m),d=m-r,c=Math.cos(Math.PI*d),w=Math.sqrt(p[i+1])*c*c/(1+f/1500),pc=((r%12)+12)%12;C[t*12+pc]+=w;if(f<250)B[t*12+pc]+=w}}
+const CS=new Float32Array(nF*12),tot=new Float64Array(12);
+for(let t=0;t<nF;t++){let n=0;const v=new Float64Array(12);for(let u=Math.max(0,t-5);u<=Math.min(nF-1,t+5);u++){n++;for(let j=0;j<12;j++)v[j]+=C[u*12+j]}
+ let nn=0;for(let j=0;j<12;j++)nn+=v[j]*v[j];nn=Math.sqrt(nn)||1;for(let j=0;j<12;j++){CS[t*12+j]=v[j]/nn;tot[j]+=v[j]}}
+/* tom */
+let bk=0,bs=-9;const cor=(a,b)=>{const ma=a.reduce((x,y)=>x+y)/12,mb=b.reduce((x,y)=>x+y)/12;let s=0,x=0,z=0;for(let i=0;i<12;i++){s+=(a[i]-ma)*(b[i]-mb);x+=(a[i]-ma)**2;z+=(b[i]-mb)**2}return s/Math.sqrt(x*z||1)};
+for(let r=0;r<12;r++)for(let m=0;m<2;m++){const pr=m?Km:KM,rot=Array.from({length:12},(_,i)=>pr[(i-r+12)%12]),s=cor(Array.from(tot),rot);if(s>bs){bs=s;bk=r*2+m}}
+const kr=bk>>1,km=bk&1,mt=km?(kr+3)%12:kr,flat=[5,10,3,8,1,6].includes(mt);
+/* tempo */
+prog(.9,'A medir o tempo…');await tick();const on=await onsetEnv(y),bpm=estTempo(on);
+
+const sorted=Float64Array.from(en).sort(),thr=.03*sorted[Math.floor(.95*(nF-1))];
+return{nF,C,CS,B,en,thr,on,bpm,key:{r:kr,m:km},flat,tune,dur:buf.duration}}
+
+/* Tempo: envelope de ataques (janela curta, 24 bandas) + tempograma com harmónicos + refinamento por pente de batidas */
+const H2=256,FS=SR/H2;
+async function onsetEnv(y){
+const W=1024,n=Math.max(1,Math.floor((y.length-W)/H2)+1),fft=mkFFT(W),w=new Float64Array(W),re=new Float64Array(W),im=new Float64Array(W);
+for(let i=0;i<W;i++)w[i]=.5-.5*Math.cos(2*Math.PI*i/W);
+const ed=[];for(let b=0;b<=24;b++)ed.push(Math.round(40*Math.pow(250,b/24)*W/SR));
+for(let b=1;b<ed.length;b++)if(ed[b]<=ed[b-1])ed[b]=ed[b-1]+1;
+const nb=ed.length-1,pv=new Float64Array(nb),o=new Float64Array(n);
+for(let t=0;t<n;t++){const s=t*H2;for(let i=0;i<W;i++){re[i]=(y[s+i]||0)*w[i];im[i]=0}fft(re,im);
+ let f=0;for(let b=0;b<nb;b++){let e=0;for(let k=ed[b];k<ed[b+1];k++)e+=Math.hypot(re[k],im[k]);const l=Math.log1p(100*e/(ed[b+1]-ed[b])/(W/4)),d=l-pv[b];if(d>0&&t)f+=d;pv[b]=l}
+ o[t]=f/nb;if(t%500==0)await tick()}
+const hw=Math.round(.3*FS),cs=new Float64Array(n+1),r=new Float64Array(n);let sd=0;
+for(let i=0;i<n;i++)cs[i+1]=cs[i]+o[i];
+for(let i=0;i<n;i++){const a=Math.max(0,i-hw),b=Math.min(n,i+hw+1);r[i]=Math.max(0,o[i]-(cs[b]-cs[a])/(b-a));sd+=r[i]*r[i]}
+sd=Math.sqrt(sd/n)||1;for(let i=0;i<n;i++)r[i]/=sd;return r}
+function comb(o,b){const p=60/b*FS,n=o.length;let bs=-1e9,bp=0;for(let ph=0;ph<p;ph+=.5){let s=0,c=0;for(let x=ph;x<n-1;x+=p){const i=x|0,f=x-i;s+=o[i]*(1-f)+o[i+1]*f;c++}s/=c||1;if(s>bs){bs=s;bp=ph}}return[bs,bp]}
+function estTempo(o){
+const n=o.length,ml=Math.max(2,Math.min(n-2,Math.ceil(8*FS))),ac=new Float64Array(ml+2);
+for(let L=1;L<=ml;L++){let s=0;for(let i=0;i+L<n;i++)s+=o[i]*o[i+L];ac[L]=s/(n-L)}
+const g=x=>{const i=Math.floor(x);return i+1>ml?0:ac[i]*(1-(x-i))+ac[i+1]*(x-i)};
+const sc=b=>{const L=60/b*FS;return(g(L)+.7*g(2*L)+.5*g(3*L)+.35*g(4*L))*Math.exp(-.5*Math.pow(Math.log2(b/120)/.75,2))};
+let b0=120,bs=-1e18;for(let b=55;b<=215;b+=.25){const s=sc(b);if(s>bs){bs=s;b0=b}}
+let bb=b0,cb=-1e9;for(let b=b0-2;b<=b0+2;b+=.05){const s=comb(o,b)[0];if(s>cb){cb=s;bb=b}}
+return Math.round(bb*10)/10}
+function phase(o,bpm){const ph=comb(o,bpm)[1];return((ph*H2+820)/SR)%(60/bpm)}
+
+/* Descodificação (Viterbi) */
+function chordSet(ext){const L=[];for(let r=0;r<12;r++)for(const[suf,iv,pen]of TYPES.slice(0,ext?5:2)){const t=new Float64Array(12);for(const i of iv)t[(r+i)%12]=i?1:1.3;const n=Math.sqrt(t.reduce((a,b)=>a+b*b,0));L.push({root:r,suf,iv,pen,t:t.map(v=>v/n)})}return L}
+const nm=c=>c.N?'N.C.':(S.flat?FL:SH)[c.root]+c.suf;
+/* Descodificação por batida: cada célula = 1 batida (ou meia, se não alinhar); baixo forte + tom como prior suave */
+function decode(){
+const a=S.an;if(!a)return;
+const ext=$('ext').value==='1',snap=$('snap').checked,bpm=Math.min(300,Math.max(30,+$('bpm').value||a.bpm));
+S.bpm=bpm;S.ph=phase(a.on,bpm);
+const g=snap?60/bpm:30/bpm,o=((S.ph%g)+g)%g,nc=Math.ceil((a.dur-o)/g)+1,chs=chordSet(ext);chs.push({N:1,root:0,iv:[]});S.chs=chs;const n=chs.length;
+const ko=$('kx').value,kk=ko===''?a.key:{r:+ko>>1,m:+ko&1},dia=new Set((kk.m?[0,2,3,5,7,8,10,11]:[0,2,4,5,7,9,11]).map(d=>(kk.r+d)%12));
+const pen=[2.2,3.5,5,8,13][S.lv],E=new Float64Array(n),bp=new Uint8Array(nc*n);let pv=new Float64Array(n),cu=new Float64Array(n),f0=0;
+for(let i=0;i<nc;i++){
+ const t0=o+(i-1)*g,t1=t0+g,v=new Float64Array(12),bv=new Float64Array(12);let en=0,c=0;
+ while(f0<a.nF&&(f0*HOP+N/2)/SR<t0)f0++;
+ for(let f=f0;f<a.nF&&(f*HOP+N/2)/SR<t1;f++){for(let j=0;j<12;j++){v[j]+=a.C[f*12+j];bv[j]+=a.B[f*12+j]}en+=a.en[f];c++}
+ let nv=0,bm=1e-9;for(let j=0;j<12;j++){nv+=v[j]*v[j];if(bv[j]>bm)bm=bv[j]}nv=Math.sqrt(nv)||1;
+ for(let s=0;s<n-1;s++){const h=chs[s];let d=0;for(let j=0;j<12;j++)d+=v[j]*h.t[j];d/=nv;let ik=1;for(const x of h.iv)if(!dia.has((h.root+x)%12)){ik=0;break}E[s]=10*(d+.25*bv[h.root]/bm-h.pen+(ik?.03:0))}
+ E[n-1]=10*(c&&en/c<a.thr?1.5:.35);if(!c)E.fill(0);
+ if(!i)pv.set(E);else{let bi=0;for(let s=1;s<n;s++)if(pv[s]>pv[bi])bi=s;const bw=pv[bi]-pen;for(let s=0;s<n;s++){if(pv[s]>=bw){cu[s]=pv[s]+E[s];bp[i*n+s]=s}else{cu[s]=bw+E[s];bp[i*n+s]=bi}}[pv,cu]=[cu,pv]}}
+let s=0;for(let i=1;i<n;i++)if(pv[i]>pv[s])s=i;const path=new Uint8Array(nc);for(let i=nc-1;i>=0;i--){path[i]=s;if(i)s=bp[i*n+s]}
+const out=[];for(let i=0;i<nc;i++){const st=i?Math.max(0,o+(i-1)*g):0,e2=i==nc-1?a.dur:Math.min(a.dur,o+i*g);if(e2-st<.01&&i<nc-1)continue;const l=out[out.length-1],c2=chs[path[i]];if(l&&l.c===c2)l.e=e2;else out.push({s:st,e:e2,c:c2})}
+if(out.length)out[0].s=0;
+S.segs=out;S.auto=keyScore(a,out);const k=ko===''?S.auto:kk;S.key=k;S.flat=[5,10,3,8,1].includes(k.m?(k.r+3)%12:k.r);render()}
+function decodeOld(){
+const a=S.an;if(!a)return;
+const ext=$('ext').value==='1',pen=[6,12,22,34,50][S.lv],snap=$('snap').checked,bpm=Math.min(300,Math.max(30,+$('bpm').value||a.bpm));
+S.bpm=bpm;S.ph=phase(a.on,bpm);const chs=chordSet(ext);chs.push({N:1,root:0,iv:[]});S.chs=chs;
+const n=chs.length,nF=a.nF,bp=new Uint8Array(nF*n);let pv=new Float64Array(n),cu=new Float64Array(n);const e=new Float64Array(n),beta=10;
+for(let t=0;t<nF;t++){
+ let bm=0,bb=0;for(let j=0;j<12;j++)if(a.B[t*12+j]>bm)bm=a.B[t*12+j];
+ for(let s=0;s<n-1;s++){const c=chs[s];let d=0;for(let j=0;j<12;j++)d+=a.CS[t*12+j]*c.t[j];e[s]=beta*(d+(bm>0?.08*a.B[t*12+c.root]/bm:0)-c.pen)}
+ e[n-1]=beta*(a.en[t]<a.thr?1.5:.35);
+ if(t==0){pv.set(e);continue}
+ let bi=0;for(let s=1;s<n;s++)if(pv[s]>pv[bi])bi=s;const bv=pv[bi]-pen;
+ for(let s=0;s<n;s++){if(pv[s]>=bv){cu[s]=pv[s]+e[s];bp[t*n+s]=s}else{cu[s]=bv+e[s];bp[t*n+s]=bi}}
+ [pv,cu]=[cu,pv]}
+let s=0;for(let i=1;i<n;i++)if(pv[i]>pv[s])s=i;
+const path=new Uint8Array(nF);for(let t=nF-1;t>=0;t--){path[t]=s;if(t)s=bp[t*n+s]}
+mergeShort(path,nF,chs,a,[.5,1,1.5,2,3][S.lv]*60/bpm/HS);
+let segs=[],st=0;const bt=t=>Math.max(0,(t*HOP+N/2-HOP/2)/SR);
+for(let t=1;t<=nF;t++)if(t==nF||path[t]!=path[st]){segs.push({s:st?bt(st):0,e:t==nF?a.dur:bt(t),c:chs[path[st]]});st=t}
+if(snap){const P=60/bpm,ph=phase(a.on,bpm),q=b=>Math.max(0,ph+Math.round((b-ph)/P)*P);
+ segs.forEach((g,i)=>{g.s=i?q(g.s):0;g.e=i==segs.length-1?a.dur:q(g.e)});
+ segs=segs.filter(g=>g.e-g.s>.01)}
+const out=[];for(const g of segs){const l=out[out.length-1];if(l&&l.c===g.c)l.e=g.e;else out.push({...g})}
+S.segs=out;S.auto=keyScore(a,out);const ko=$('kx').value,k=ko===''?S.auto:{r:+ko>>1,m:+ko&1};S.key=k;S.flat=[5,10,3,8,1].includes(k.m?(k.r+3)%12:k.r);render()}
+
+/* Interface */
+const fmt=t=>Math.floor(t/60)+':'+(t%60).toFixed(1).padStart(4,'0');
+const col=c=>c.N?'var(--bd)':`hsl(${c.root*30},${c.suf.startsWith('m')&&c.suf!=='maj7'?45:65}%,${c.suf.startsWith('m')&&c.suf!=='maj7'?42:55}%)`;
+function render(){
+const a=S.an,tl=$('tl');tl.querySelectorAll('span').forEach(x=>x.remove());$('list').innerHTML='';
+S.segs.forEach((g,i)=>{const sp=document.createElement('span');sp.style.flex=(g.e-g.s)+' 0 0';sp.style.background=col(g.c);sp.title=nm(g.c);tl.insertBefore(sp,$('ph'));
+ const d=document.createElement('div');d.dataset.i=i;d.innerHTML=nm(g.c)+'<small>'+fmt(g.s)+'</small>';d.onclick=()=>{$('au').currentTime=g.s;$('au').play()};$('list').appendChild(d)});
+$('info').textContent=`Tom: ${keyName(S.key)} · BPM ${S.bpm} · ${S.segs.filter(g=>!g.c.N).length} acordes`;$('kx').options[0].text='Automático ('+keyName(S.auto)+')';lI=-2;dirty=true;upd()}
+function upd(){const au=$('au'),t=au.currentTime;if(!S.segs.length)return;
+const i=S.segs.findIndex(g=>t>=g.s&&t<g.e);$('cur').textContent=i<0?'–':nm(S.segs[i].c);
+$('ph').style.left=(100*t/(S.an.dur||1))+'%';
+document.querySelectorAll('#list .a').forEach(x=>x.classList.remove('a'));
+if(i>=0){const el=$('list').children[i];el.classList.add('a');if(!au.paused){const L=$('list');if(el.offsetTop<L.scrollTop||el.offsetTop+el.offsetHeight>L.scrollTop+L.clientHeight)L.scrollTop=el.offsetTop-40}}}
+setInterval(upd,90);
+/* Visual em tempo real: piano + fita de acordes */
+const cv=$('rb'),cx=cv.getContext('2d');let lI=-2,lT=-1;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';
+(function(){let h='';const w=100/14,wk=[0,2,4,5,7,9,11],bk={1:1,3:2,6:4,8:5,10:6};
+for(let o=0;o<2;o++)wk.forEach((p,i)=>h+=`<i class="wk" data-p="${o*12+p}" style="left:${(o*7+i)*w}%;width:${w}%"></i>`);
+for(let o=0;o<2;o++)for(const p in bk)h+=`<i class="bk" data-p="${o*12+ +p}" style="left:${(o*7+bk[p]-.3)*w}%;width:${.6*w}%"></i>`;
+$('pn').innerHTML=h})();
+function draw(){
+const a=S.an;if(!a||!S.segs.length)return;
+const t=S.vt!=null?S.vt:$('au').currentTime,dp=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+if(cv.width!==Math.round(W*dp)){cv.width=Math.round(W*dp);cv.height=Math.round(H*dp);dirty=true}
+if(t===lT&&!dirty)return;lT=t;dirty=false;
+const i=S.segs.findIndex(g=>t>=g.s&&t<g.e),g=S.segs[i],NN=S.flat?FL:SH;
+if(i!==lI){lI=i;const c=g&&g.c;$('nt').textContent=c&&!c.N?c.iv.map(v=>NN[(c.root+v)%12]).join(' · '):'';
+ $('pn').childNodes.forEach(el=>{const k=+el.dataset.p,r=c&&!c.N?k-c.root:-1;el.classList.toggle('r',r===0);el.classList.toggle('n',r>0&&c.iv.includes(r))});gUpd(i)}
+const nx=i>=0?S.segs[i+1]:null;$('nx').textContent=nx?'→ '+nm(nx.c)+' em '+Math.max(0,nx.s-t).toFixed(1)+' s':'';
+cx.setTransform(dp,0,0,dp,0,0);cx.clearRect(0,0,W,H);
+const win=12,bk=3,pps=W/win,X=s=>(s-(t-bk))*pps,P=60/S.bpm;
+cx.strokeStyle=css('--bd');cx.lineWidth=1;cx.beginPath();
+for(let b=Math.ceil((t-bk-S.ph)/P);S.ph+b*P<t-bk+win;b++){const x=X(S.ph+b*P);cx.moveTo(x,0);cx.lineTo(x,H)}cx.stroke();
+cx.textBaseline='middle';
+for(const q of S.segs){if(q.e<t-bk||q.s>t-bk+win)continue;const x=X(q.s),w=(q.e-q.s)*pps,on=q===g;
+ cx.globalAlpha=on?1:q.e<=t?.35:.85;cx.fillStyle=q.c.N?css('--bd'):col(q.c);cx.beginPath();(cx.roundRect||cx.rect).call(cx,x+1,8,Math.max(1,w-2),H-16,8);cx.fill();cx.globalAlpha=1;
+ if(w>34&&!q.c.N){cx.fillStyle='#fff';cx.font=`700 ${on?22:17}px system-ui,sans-serif`;cx.fillText(nm(q.c),Math.min(Math.max(x+10,8),x+w-40),H/2)}}
+cx.fillStyle=css('--fg');cx.fillRect(X(t)-1,0,2,H)}
+(function L(){draw();requestAnimationFrame(L)})();
+/* Fita com scroll livre: arrastar, roda do rato ou toque num acorde */
+(function(){let x0=0,t0=0,mv=false,pl=false;const au=$('au'),pps=()=>cv.clientWidth/12;
+cv.onpointerdown=e=>{if(!S.segs.length)return;cv.setPointerCapture(e.pointerId);x0=e.clientX;t0=au.currentTime;mv=false;pl=!au.paused;S.vt=t0};
+cv.onpointermove=e=>{if(S.vt==null)return;const dx=e.clientX-x0;if(Math.abs(dx)>5&&!mv){mv=true;au.pause()}if(mv){S.vt=Math.max(0,Math.min(S.an.dur,t0-dx/pps()));au.currentTime=S.vt}};
+cv.onpointerup=cv.onpointercancel=e=>{if(S.vt==null)return;if(!mv){const t=t0-3+(e.clientX-cv.getBoundingClientRect().left)/pps(),g=S.segs.find(q=>t>=q.s&&t<q.e);if(g)au.currentTime=g.s}else if(pl)au.play();S.vt=null;dirty=true};
+cv.onwheel=e=>{if(!S.segs.length)return;e.preventDefault();au.currentTime=Math.max(0,Math.min(S.an.dur,au.currentTime+(e.deltaX||e.deltaY)/pps()))}})();
+/* Piano / Guitarra */
+$('ins').querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{S.ins=i;$('ins').querySelectorAll('button').forEach((x,j)=>x.classList.toggle('on',i===j));$('pn').hidden=!!i;$('gt').hidden=!i;lI=-2;dirty=true});
+const OP=[4,9,2,7,11,4],gc={};
+function guitar(c){const key=c.root+c.suf;if(key in gc)return gc[key];
+const tn=c.iv.map(v=>(c.root+v)%12),rq=tn.filter((_,i)=>c.iv[i]!==7);let best=null,bs=-1e9;const f=[];
+const ev=()=>{const pl=f.filter(x=>x>=0);if(pl.length<4)return;if(!rq.every(p=>f.some((x,s)=>x>=0&&(OP[s]+x)%12===p)))return;
+ const fr=pl.filter(x=>x>0),mn=Math.min(...fr),mx=Math.max(...fr),sp=fr.length?mx-mn:0;if(sp>3)return;
+ const op=pl.length-fr.length,am=fr.filter(x=>x===mn).length,fg=op?fr.length:fr.length-am+(am?1:0);if(fg>4)return;
+ const lo=f.findIndex(x=>x>=0),cov=new Set(f.map((x,s)=>x>=0?(OP[s]+x)%12:-1).filter(x=>x>=0)).size;
+ const sc=10*cov+4*((OP[lo]+f[lo])%12===c.root)+1.5*pl.length-3*sp-.5*(fr.length?mn:0)+.8*op;if(sc>bs){bs=sc;best=f.slice()}};
+for(let b=0;b<=9;b++){const fs=b?[0,b,b+1,b+2,b+3]:[0,1,2,3,4];
+ const rec=s=>{if(s===6)return ev();if(f.slice(0,s).every(x=>x===-1)){f[s]=-1;rec(s+1)}for(const x of fs)if(tn.includes((OP[s]+x)%12)){f[s]=x;rec(s+1)}};rec(0)}
+return gc[key]=best}
+function gSvg(c,lb){const f=guitar(c);if(!f)return'';const fr=f.filter(x=>x>0),base=Math.max(0,...fr)<=5?1:Math.min(...fr);
+let s=`<svg viewBox="0 0 140 172" fill="none" stroke="currentColor" stroke-width="1.5"><text x="76" y="13" text-anchor="middle" fill="currentColor" stroke="none" font-size="14" font-weight="700">${nm(c)}</text>`;
+for(let i=0;i<6;i++)s+=`<path d="M${36+i*16} 40V150"/>`;
+for(let j=0;j<=5;j++)s+=`<path d="M36 ${40+j*22}H116"${j===0&&base===1?' stroke-width="5"':''}/>`;
+if(base>1)s+=`<text x="2" y="55" fill="currentColor" stroke="none" font-size="11">${base}fr</text>`;
+f.forEach((x,i)=>{const cx=36+i*16;if(x<0)s+=`<text x="${cx}" y="34" text-anchor="middle" fill="currentColor" stroke="none" font-size="13">×</text>`;else if(x===0)s+=`<circle cx="${cx}" cy="29" r="4"/>`;else s+=`<circle cx="${cx}" cy="${40+(x-base+.5)*22}" r="7" stroke="none" style="fill:${(OP[i]+x)%12===c.root?'#ff8a3d':'var(--ac)'}"/>`});
+return s+`<text x="76" y="167" text-anchor="middle" fill="currentColor" stroke="none" font-size="11" opacity=".7">${lb}</text></svg>`}
+function gUpd(i){if(S.ins!==1)return;const g=S.segs[i],n=S.segs[i+1];$('g1').innerHTML=g&&!g.c.N?gSvg(g.c,'Agora'):'';$('g2').innerHTML=n&&!n.c.N?gSvg(n.c,'A seguir'):''}
+/* Estabilidade: absorve acordes muito curtos no vizinho mais parecido */
+function mergeShort(path,nF,chs,a,minF){
+const runs=[];for(let t=0,s=0;t<=nF;t++)if(t==nF||path[t]!=path[s]){runs.push({s,e:t,c:path[s]});s=t}
+const sim=(r,c)=>{if(chs[c].N)return .3;const v=new Float64Array(12);for(let t=r.s;t<r.e;t++)for(let j=0;j<12;j++)v[j]+=a.CS[t*12+j];let d=0,n=0;for(let j=0;j<12;j++){d+=v[j]*chs[c].t[j];n+=v[j]*v[j]}return d/(Math.sqrt(n)||1)};
+for(;;){let k=-1,m=1e9;runs.forEach((r,i)=>{const l=r.e-r.s;if(l<minF&&l<m&&runs.length>1){m=l;k=i}});if(k<0)break;
+ const r=runs[k],p=runs[k-1],q=runs[k+1],w=p&&(!q||sim(r,p.c)>=sim(r,q.c))?p:q;
+ if(w===p)p.e=r.e;else q.s=r.s;runs.splice(k,1);
+ for(let i=runs.length-1;i>0;i--)if(runs[i].c===runs[i-1].c){runs[i-1].e=runs[i].e;runs.splice(i,1)}}
+for(const r of runs)path.fill(r.c,r.s,r.e)}
+$('tl').onclick=e=>{const r=$('tl').getBoundingClientRect();$('au').currentTime=S.an.dur*(e.clientX-r.left)/r.width};
+/* Tom a partir dos acordes detetados + baixo */
+const MAJ=['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'],MIN=['C','C#','D','Eb','E','F','F#','G','G#','A','Bb','B'];
+const keyName=k=>(k.m?MIN:MAJ)[k.r]+(k.m?' menor':' maior');
+const DM=[[0,0,2],[2,1,.8],[4,1,.8],[5,0,1.1],[7,0,1.3],[9,1,1.2]],Dm=[[0,1,2],[3,0,.9],[5,1,1.1],[7,1,1],[7,0,1],[8,0,.9],[10,0,.9]];
+function keyScore(a,segs){
+if(!a.bt){const v=new Float64Array(12);for(let t=0;t<a.nF;t++)for(let j=0;j<12;j++)v[j]+=a.B[t*12+j];const mx=Math.max(...v)||1;a.bt=v.map(x=>x/mx)}
+const q=c=>c.suf==='m'||c.suf==='m7'?1:0,sg=segs.filter(g=>!g.c.N);if(!sg.length)return a.key;
+let tot=0;for(const g of sg)tot+=g.e-g.s;let best=a.key,bs=-9;
+for(let r=0;r<12;r++)for(let m=0;m<2;m++){let s=0;const D=m?Dm:DM;
+ for(const g of sg){const d=g.e-g.s,w=D.find(x=>x[0]===(g.c.root-r+12)%12&&x[1]===q(g.c));s+=w?d*w[2]:-.5*d}
+ s/=tot;for(const g of[sg[0],sg[sg.length-1]])if(g.c.root===r&&q(g.c)===m)s+=.15;
+ s+=.6*a.bt[r]+(a.key.r===r&&a.key.m===m?.15:0);if(s>bs){bs=s;best={r,m}}}
+return best}
+$('kx').innerHTML='<option value="">Automático</option>'+Array.from({length:24},(_,i)=>`<option value="${i}">${keyName({r:i>>1,m:i&1})}</option>`).join('');
+['ext','snap','kx'].forEach(id=>$(id).addEventListener('input',decode));
+$('lv').querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{S.lv=i;$('lv').querySelectorAll('button').forEach((x,j)=>x.classList.toggle('on',i===j));decode()});$('bpm').addEventListener('change',decode);
+$('b2').onclick=()=>{$('bpm').value=Math.max(30,+$('bpm').value/2).toFixed(1);decode()};
+$('bx').onclick=()=>{$('bpm').value=Math.min(300,+$('bpm').value*2).toFixed(1);decode()};
+
+async function load(f){
+if(!f)return;file=f;$('res').hidden=true;$('prog').hidden=false;$('au').src=URL.createObjectURL(f);
+try{prog(0,'A descodificar o ficheiro…');const ac=new (window.AudioContext||window.webkitAudioContext)(),buf=await ac.decodeAudioData(await f.arrayBuffer());ac.close();
+ S.an=await analyze(buf);$('bpm').value=S.an.bpm.toFixed(1);$('prog').hidden=true;$('res').hidden=false;decode()}
+catch(err){prog(0,'Não foi possível analisar este ficheiro ('+(err&&err.message||'formato não suportado')+').')}}
+const dz=$('drop');dz.onclick=()=>$('f').click();$('f').onchange=e=>load(e.target.files[0]);
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};dz.ondragleave=()=>dz.classList.remove('on');
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('on');load(e.dataTransfer.files[0])};
+
+/* MIDI + ZIP */
+const vlq=n=>{const b=[n&127];while(n>>=7)b.unshift((n&127)|128);return b},u32=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255];
+const txt=(t,s)=>{const b=[...new TextEncoder().encode(s)];return[0xFF,t,...vlq(b.length),...b]};
+function midi(segs,bpm){
+const T=s=>Math.round(s*bpm/60*480),mpq=Math.round(6e7/bpm);
+const trk=ev=>{ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);let last=0;const d=[];for(const[t,,by]of ev){d.push(...vlq(t-last),...by);last=t}d.push(0,0xFF,0x2F,0);return[0x4D,0x54,0x72,0x6B,...u32(d.length),...d]};
+const t0=[[0,0,[0xFF,0x51,3,(mpq>>16)&255,(mpq>>8)&255,mpq&255]],[0,0,txt(3,'Acordes detetados')]],ch=[[0,0,txt(3,'Acordes')]],bs=[[0,0,txt(3,'Baixo')]];
+for(const g of segs){if(g.c.N)continue;const a=T(g.s),b=Math.max(a+1,T(g.e)),base=48+g.c.root;ch.push([a,0,txt(6,nm(g.c))]);
+ for(const i of g.c.iv){ch.push([a,1,[0x90,base+i,80]]);ch.push([b,0,[0x80,base+i,0]])}
+ bs.push([a,1,[0x91,36+g.c.root,95]],[b,0,[0x81,36+g.c.root,0]])}
+return new Uint8Array([0x4D,0x54,0x68,0x64,0,0,0,6,0,1,0,3,0x01,0xE0,...trk(t0),...trk(ch),...trk(bs)])}
+const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=b=>{let c=-1;for(const x of b)c=crcT[(c^x)&255]^(c>>>8);return(c^-1)>>>0};
+function zip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+for(const f of files){const n=enc.encode(f.name),c=crc(f.data),L=f.data.length,h=new DataView(new ArrayBuffer(30));
+ h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x800,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,L,true);h.setUint32(22,L,true);h.setUint16(26,n.length,true);
+ parts.push(new Uint8Array(h.buffer),n,f.data);
+ const d=new DataView(new ArrayBuffer(46));d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,0x800,true);d.setUint16(14,0x21,true);d.setUint32(16,c,true);d.setUint32(20,L,true);d.setUint32(24,L,true);d.setUint16(28,n.length,true);d.setUint32(42,off,true);
+ cen.push(new Uint8Array(d.buffer),n);off+=30+n.length+L}
+const cl=cen.reduce((a,b)=>a+b.length,0),e=new DataView(new ArrayBuffer(22));
+e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cl,true);e.setUint32(16,off,true);
+return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/zip'})}
+$('dl').onclick=async()=>{
+const base=(file&&file.name||'musica').replace(/\.[^.]+$/,''),enc=new TextEncoder();
+const lines=S.segs.map(g=>fmt(g.s)+'\t'+nm(g.c)).join('\n')+`\n\nBPM ${S.bpm}`;
+const blob=zip([{name:'acordes.mid',data:midi(S.segs,S.bpm)},{name:'acordes.txt',data:enc.encode(lines)}]);
+let d=null;try{d=window.claude&&await claude.use('downloads')}catch(e){}
+try{if(d)await d.save({filename:'acordes-'+base+'.zip',data:blob});else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='acordes-'+base+'.zip';a.click()}
+$('dls').textContent='ZIP com acordes.mid e acordes.txt.'}catch(e){$('dls').textContent=e&&e.code==='declined'?'':'Não foi possível guardar.'}};
+</script>
+</body>
+</html>
